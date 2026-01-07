@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict
 
 from fastapi import FastAPI
@@ -13,7 +13,7 @@ app = FastAPI(title="Options Spread Scanner", version="0.1.0")
 
 @app.get("/health", response_model=HealthResponse)
 def health() -> HealthResponse:
-    return HealthResponse(status="ok", timestamp=datetime.utcnow())
+    return HealthResponse(status="ok", timestamp=datetime.now(timezone.utc))
 
 
 @app.post("/scan", response_model=ScanResponse)
@@ -23,7 +23,7 @@ def scan(request: ScanRequest) -> ScanResponse:
 
     return ScanResponse(
         ticker=request.ticker,
-        timestamp=datetime.utcnow(),
+        timestamp=datetime.now(timezone.utc),
         regime=regime,
         results=ScanResults(**candidates),
     )
