@@ -15,7 +15,7 @@ def _filter_liquidity(liquidity: LiquidityFilters, bid: float, ask: float, oi: i
     mid = (bid + ask) / 2
     if mid <= 0:
         return False
-    bid_ask_pct = (ask - bid) / mid if mid else 1.0
+    bid_ask_pct = (ask - bid) / mid
     # TODO: Replace stubbed bid/ask/OI/volume with live order book + depth data.
     return (
         bid_ask_pct <= liquidity.maxBidAskPct
@@ -28,10 +28,10 @@ def _earnings_stub(allow_earnings: bool, expiry: date) -> EarningsRisk:
     # TODO: Replace stubbed earnings schedule with corporate actions calendar lookup.
     # For safety, assume an upcoming earnings event in 5 days to exercise blocking logic.
     days_to_earnings = 5
-    has_earnings = True
     dte = (expiry - date.today()).days
-    occurs_before_expiry = days_to_earnings is not None and dte >= 0 and days_to_earnings <= dte
-    blocked = occurs_before_expiry and (has_earnings and not allow_earnings)
+    occurs_before_expiry = dte >= 0 and days_to_earnings <= dte
+    has_earnings = occurs_before_expiry
+    blocked = occurs_before_expiry and not allow_earnings
     return EarningsRisk(hasEarnings=has_earnings, daysToEarnings=days_to_earnings, blocked=blocked)
 
 
