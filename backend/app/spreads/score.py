@@ -2,7 +2,17 @@ from __future__ import annotations
 
 from typing import Dict, List, Tuple
 
-from app.models.schemas import Bias, LiquidityFilters
+from app.models.schemas import Bias, EarningsRisk, LiquidityFilters
+from app.spreads.constants import (
+    BIAS_ALIGNMENT_BONUS,
+    BIAS_MISALIGNMENT_PENALTY,
+    BIAS_WEIGHT,
+    EARNINGS_SCORE_PENALTY,
+    EARNINGS_WEIGHT,
+    EV_WEIGHT,
+    LIQUIDITY_WEIGHT,
+    ROR_WEIGHT,
+)
 
 
 def build_liquidity_score(liquidity: LiquidityFilters) -> float:
@@ -15,6 +25,7 @@ def build_liquidity_score(liquidity: LiquidityFilters) -> float:
 
 def compute_probabilities(short_strike: float, request) -> Dict[str, float]:
     # Simplified probability: use delta proxy adjusted by bias
+    # TODO: Replace with calibrated probability of touch/expire ITM using IV surface.
     base_delta = min(request.shortDeltaMax, 0.5)
     bias_adjustment = {
         Bias.bullish: 0.05,
@@ -29,29 +40,38 @@ def compute_probabilities(short_strike: float, request) -> Dict[str, float]:
 
 
 def compute_scores(
+    spread_type: str,
     credit_conservative: float,
     max_loss: float,
     liquidity_score: float,
     bias: Bias,
     p_win: float,
     p_loss: float,
-    has_earnings: bool,
+    earnings_risk: EarningsRisk,
 ) -> Tuple[float, float, float, float, float, List[str]]:
     expected_profit = credit_conservative * p_win
     expected_loss = max_loss * p_loss
     ev = expected_profit - expected_loss
     ror = credit_conservative / max_loss if max_loss else 0
 
-    bias_alignment = 0.1 if bias in (Bias.bullish, Bias.bearish) else 0
-    earnings_penalty = -0.05 if has_earnings else 0
+    bias_alignment = 0.0
+    if bias == Bias.bullish and spread_type == "PUT_CREDIT":
+        bias_alignment = BIAS_ALIGNMENT_BONUS
+    elif bias == Bias.bearish and spread_type == "CALL_CREDIT":
+        bias_alignment = BIAS_ALIGNMENT_BONUS
+    elif bias in (Bias.bullish, Bias.bearish):
+        bias_alignment = BIAS_MISALIGNMENT_PENALTY
+
+    earnings_penalty = EARNINGS_SCORE_PENALTY if earnings_risk.hasEarnings else 0
 
     score = (
-        ev * 0.4
-        + ror * 0.25
-        + liquidity_score * 0.2
-        + bias_alignment * 0.1
-        + earnings_penalty * 0.05
+        ev * EV_WEIGHT
+        + ror * ROR_WEIGHT
+        + liquidity_score * LIQUIDITY_WEIGHT
+        + bias_alignment * BIAS_WEIGHT
+        + earnings_penalty * EARNINGS_WEIGHT
     )
+    # TODO: Add score normalization across expirations/underlyings to improve comparability.
 
     why = [
         f"p(win)={p_win:.2f}",
@@ -59,7 +79,7 @@ def compute_scores(
         f"RoR={ror:.2f}",
         f"Liquidity={liquidity_score:.2f}",
     ]
-    if has_earnings:
+    if earnings_risk.hasEarnings:
         why.append("earnings penalty applied")
 
     return ev, expected_profit, expected_loss, ror, score, why

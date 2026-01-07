@@ -8,7 +8,7 @@ for production.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict
 
 
@@ -32,11 +32,13 @@ class OptionQuote:
 
 def fetch_underlying_quote(ticker: str) -> UnderlyingQuote:
     # Stubbed SPY-like quote
-    return UnderlyingQuote(price=475.25, iv30=0.18, timestamp=datetime.utcnow())
+    # TODO: Replace stubbed quote with live IB market data subscription.
+    return UnderlyingQuote(price=475.25, iv30=0.18, timestamp=datetime.now(timezone.utc))
 
 
 def fetch_option_quotes(ticker: str, expiry: str) -> Dict[float, OptionQuote]:
     # Keyed by strike
+    # TODO: Replace stubbed option quotes with IB chain + Greeks data.
     strikes = [470, 472, 475, 477, 480]
     return {
         strike: OptionQuote(
